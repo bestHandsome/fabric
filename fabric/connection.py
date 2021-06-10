@@ -739,7 +739,7 @@ class Connection(Context):
         return self._sudo(self._remote_runner(), command, **kwargs)
 
     @opens
-    def shell(self, xxx):
+    def shell(self, **kwargs):
         """
         Run an interactive login shell on the remote end, as with ``ssh``.
 
@@ -777,15 +777,8 @@ class Connection(Context):
         - TODO: timeout? feels like not that useful? if you wouldn't be able to
           successfully Ctrl-C there may not be much a timeout could do...
 
-        Those keyword arguments also honor configuration, specificially:
-
-        - They'll default to looking at the ``run.*`` tree, e.g.
-          ``run.encoding``.
-        - However, you may separate the behaviors of ``run`` and ``shell`` by
-          setting overrides in the ``shell.*`` tree, e.g. ``shell.encoding``.
-        - *Be careful* when manipulating the ``shell.*`` config tree; it has
-          certain defaults (such as ``pty``) which cannot be modified without
-          breaking core `shell` behavior.
+        Those keyword arguments also honor the ``run.*`` configuration tree, as
+        in `run`/`sudo`.
 
         :returns: ``None``. (TODO: or not? lol)
 
@@ -795,8 +788,22 @@ class Connection(Context):
 
         .. versionadded:: 2.7
         """
-        # TODO: config: its own subtree that 'masks' on top of 'run' (like how
-        # sudo's should or does)?
+        # TODO: probably yell about any unknown kwargs here? or in the runner?
+        runner = self.config.runners.remote_shell(context=self)
+        # Reinstate most defaults as kwargs to ensure user's config doesn't
+        # make this mode break horribly. Then override a few that need to
+        # change, like pty.
+        # TODO: make sure these all actually work lmao
+        # TODO: tests proving that config updating eg hide, echo etc get
+        # squashed by this
+        allowed = ('encoding', 'env', 'replace_env')
+        for key, value in self.config.global_defaults()['run'].items():
+            if key not in allowed:
+                kwargs[key] = value
+        kwargs.update(
+            pty=True,
+        )
+        return runner.run(command=None, **kwargs)
 
     def local(self, *args, **kwargs):
         """

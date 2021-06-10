@@ -5,7 +5,7 @@ from paramiko.config import SSHConfig
 from invoke import Local
 from invoke.vendor.lexicon import Lexicon
 
-from fabric import Config, Remote
+from fabric import Config, Remote, RemoteShell
 from fabric.util import get_local_user
 
 from mock import patch, call
@@ -55,7 +55,9 @@ class Config_:
 
     def amends_Invoke_runners_map(self):
         config = Config()
-        assert config.runners == dict(remote=Remote, local=Local)
+        assert config.runners == dict(
+            remote=Remote, remote_shell=RemoteShell, local=Local
+        )
 
     def uses_Fabric_prefix(self):
         # NOTE: see also the integration-esque tests in tests/main.py; this

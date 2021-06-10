@@ -22,6 +22,7 @@ from invoke.exceptions import ThreadException
 
 from fabric import Config, Connection
 from fabric.exceptions import InvalidV1Env
+from fabric.testing.base import ShellCommand
 from fabric.util import get_local_user
 
 from _util import support, faux_v1_env
@@ -29,6 +30,7 @@ from _util import support, faux_v1_env
 
 # Remote is woven in as a config default, so must be patched there
 remote_path = "fabric.config.Remote"
+remote_shell_path = "fabric.config.RemoteShell"
 
 
 def _select_result(obj):
@@ -965,6 +967,35 @@ class Connection_:
             )
             for r in (r1, r2):
                 assert r is sentinel
+
+    class shell:
+        @patch(remote_shell_path)
+        def calls_RemoteShell_run_with_kwargs_and_returns_its_result(
+            self, RemoteShell, client
+        ):
+            remote = RemoteShell.return_value
+            sentinel = object()
+            remote.run.return_value = sentinel
+            cxn = Connection("host")
+            result = cxn.shell(env={"foo": "bar"})
+            RemoteShell.assert_any_call(context=cxn)
+            remote.run.assert_called_once_with(env={"foo": "bar"})
+            assert result is sentinel
+
+        def honors_a_few_kwargs(self):
+            # encoding, env, replace_env
+            skip()
+
+        def raises_TypeError_for_other_kwargs(self):
+            skip()
+
+        def honors_config_system_for_allowed_kwargs(self):
+            # encoding, env, replace_env
+            skip()
+
+        def ignores_config_system_for_disallowed_kwargs(self):
+            # I.e. uses default config values even if config is set
+            skip()
 
     class local:
         # NOTE: most tests for this functionality live in Invoke's runner
