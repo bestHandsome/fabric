@@ -790,20 +790,29 @@ class Connection(Context):
         """
         # TODO: probably yell about any unknown kwargs here? or in the runner?
         runner = self.config.runners.remote_shell(context=self)
-        # Reinstate most defaults as kwargs to ensure user's config doesn't
-        # make this mode break horribly. Then override a few that need to
-        # change, like pty.
+        # Reinstate most defaults as explicit kwargs to ensure user's config
+        # doesn't make this mode break horribly. Then override a few that need
+        # to change, like pty.
         # TODO: make sure these all actually work lmao
         # TODO: tests proving that config updating eg hide, echo etc get
         # squashed by this
         allowed = ('encoding', 'env', 'replace_env')
+        new_kwargs = {}
         for key, value in self.config.global_defaults()['run'].items():
-            if key not in allowed:
-                kwargs[key] = value
-        kwargs.update(
+            if key in allowed:
+                # Use allowed kwargs if given, otherwise also fill them from
+                # defaults
+                new_kwargs[key] = kwargs.pop(key, value)
+            else:
+                new_kwargs[key] = value
+        new_kwargs.update(
             pty=True,
         )
-        return runner.run(command=None, **kwargs)
+        # At this point, any leftover kwargs would be ignored, so yell instead
+        if kwargs:
+            err = "shell() got unexpected keyword arguments: {!r}"
+            raise TypeError(err.format(kwargs.keys()))
+        return runner.run(command=None, **new_kwargs)
 
     def local(self, *args, **kwargs):
         """

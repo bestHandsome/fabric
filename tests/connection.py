@@ -12,7 +12,7 @@ import time
 from mock import patch, Mock, call, ANY
 from paramiko.client import SSHClient, AutoAddPolicy
 from paramiko import SSHConfig
-import pytest  # for mark
+import pytest  # for mark, internal raises
 from pytest import skip, param
 from pytest_relaxed import raises
 from invoke.vendor.lexicon import Lexicon
@@ -969,6 +969,9 @@ class Connection_:
                 assert r is sentinel
 
     class shell:
+        def setup(self):
+            self.defaults = Config.global_defaults()['run']
+
         @patch(remote_shell_path)
         def calls_RemoteShell_run_with_kwargs_and_returns_its_result(
             self, RemoteShell, client
@@ -977,17 +980,24 @@ class Connection_:
             sentinel = object()
             remote.run.return_value = sentinel
             cxn = Connection("host")
-            result = cxn.shell(env={"foo": "bar"})
+            kwargs = dict(
+                env={"foo": "bar"},
+                replace_env=True,
+                encoding='utf-16',
+            )
+            result = cxn.shell(**kwargs)
             RemoteShell.assert_any_call(context=cxn)
-            remote.run.assert_called_once_with(env={"foo": "bar"})
+            assert remote.run.call_count == 1
+            expected = dict(self.defaults, **kwargs, pty=True, command=None)
+            assert remote.run.call_args[1] == expected
             assert result is sentinel
 
-        def honors_a_few_kwargs(self):
-            # encoding, env, replace_env
-            skip()
-
-        def raises_TypeError_for_other_kwargs(self):
-            skip()
+        def raises_TypeError_for_disallowed_kwargs(self, client):
+            for key in self.defaults.keys():
+                if key in ('env', 'replace_env', 'encoding'):
+                    continue
+                with pytest.raises(TypeError, match=r'unexpected keyword'):
+                    Connection("host").shell(**{key: "whatever"})
 
         def honors_config_system_for_allowed_kwargs(self):
             # encoding, env, replace_env
