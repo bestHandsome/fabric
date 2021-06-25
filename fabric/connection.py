@@ -788,21 +788,17 @@ class Connection(Context):
 
         .. versionadded:: 2.7
         """
-        # TODO: probably yell about any unknown kwargs here? or in the runner?
         runner = self.config.runners.remote_shell(context=self)
         # Reinstate most defaults as explicit kwargs to ensure user's config
         # doesn't make this mode break horribly. Then override a few that need
         # to change, like pty.
-        # TODO: make sure these all actually work lmao
-        # TODO: tests proving that config updating eg hide, echo etc get
-        # squashed by this
         allowed = ('encoding', 'env', 'replace_env')
         new_kwargs = {}
         for key, value in self.config.global_defaults()['run'].items():
             if key in allowed:
                 # Use allowed kwargs if given, otherwise also fill them from
                 # defaults
-                new_kwargs[key] = kwargs.pop(key, value)
+                new_kwargs[key] = kwargs.pop(key, self.config.run[key])
             else:
                 new_kwargs[key] = value
         new_kwargs.update(

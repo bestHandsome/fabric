@@ -973,7 +973,7 @@ class Connection_:
             self.defaults = Config.global_defaults()['run']
 
         @patch(remote_shell_path)
-        def calls_RemoteShell_run_with_kwargs_and_returns_its_result(
+        def calls_RemoteShell_run_with_all_kwargs_and_returns_its_result(
             self, RemoteShell, client
         ):
             remote = RemoteShell.return_value
@@ -988,6 +988,8 @@ class Connection_:
             result = cxn.shell(**kwargs)
             RemoteShell.assert_any_call(context=cxn)
             assert remote.run.call_count == 1
+            # Expect explicit use of default values for all kwarg-settings
+            # besides what shell() itself tweaks
             expected = dict(self.defaults, **kwargs, pty=True, command=None)
             assert remote.run.call_args[1] == expected
             assert result is sentinel
@@ -999,13 +1001,23 @@ class Connection_:
                 with pytest.raises(TypeError, match=r'unexpected keyword'):
                     Connection("host").shell(**{key: "whatever"})
 
-        def honors_config_system_for_allowed_kwargs(self):
-            # encoding, env, replace_env
-            skip()
-
-        def ignores_config_system_for_disallowed_kwargs(self):
-            # I.e. uses default config values even if config is set
-            skip()
+        @patch(remote_shell_path)
+        def honors_config_system_for_allowed_kwargs(self, RemoteShell, client):
+            remote = RemoteShell.return_value
+            allowed = dict(
+                env={"foo": "bar"},
+                replace_env=True,
+                encoding='utf-16',
+            )
+            ignored = dict(echo=True, hide='foo')  # Spot check
+            config = Config({'run': dict(allowed, **ignored)})
+            cxn = Connection("host", config=config)
+            cxn.shell()
+            kwargs = remote.run.call_args[1]
+            for key, value in allowed.items():
+                assert kwargs[key] == value
+            for key, value in ignored.items():
+                assert kwargs[key] == self.defaults[key]
 
     class local:
         # NOTE: most tests for this functionality live in Invoke's runner
